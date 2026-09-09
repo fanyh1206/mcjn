@@ -2,9 +2,218 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0e1a" />
   <title>宠逝纪念 · 送它最后一程</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/pages.css" />
+  <link rel="stylesheet" href="css/ceremony.css" />
 </head>
 <body>
-宠逝纪念 · 送它最后一程
+  <!-- 音频：环境音（仪式）与背景音乐（纪念馆），默认不预加载，由 PM.Audio 控制播放 -->
+  <audio id="ambient" src="assets/audio/ambient.wav" loop preload="none"></audio>
+  <audio id="bgm" src="assets/audio/bgm.wav" loop preload="none"></audio>
+
+  <!-- 全局背景层：星空草地 -->
+  <div id="bg-layer" aria-hidden="true"></div>
+
+  <!-- ========== 视图一：信息填写页 ========== -->
+  <section id="view-form" class="view" hidden>
+    <div class="form-card">
+      <h1 class="form-title">送它最后一程</h1>
+      <p class="form-sub">写下它的名字与日子，我们一起，好好告别。</p>
+
+      <form id="pet-form" novalidate>
+        <div class="field">
+          <label for="f-owner">主人名称 <span class="req">*</span></label>
+          <input id="f-owner" name="ownerName" type="text" maxlength="20" placeholder="用于碑上“××× 敬立”" autocomplete="off" />
+          <small class="err" data-err="ownerName"></small>
+        </div>
+
+        <div class="field">
+          <label for="f-pet">宠物名字 <span class="req">*</span></label>
+          <input id="f-pet" name="petName" type="text" maxlength="20" placeholder="用于碑文“故 ××× 之墓”" autocomplete="off" />
+          <small class="err" data-err="petName"></small>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="f-birthday">宠物生日 <span class="req">*</span></label>
+            <input id="f-birthday" name="birthday" type="date" />
+            <small class="err" data-err="birthday"></small>
+          </div>
+          <div class="field">
+            <label for="f-death">离世日期 <span class="req">*</span></label>
+            <input id="f-death" name="deathDate" type="date" />
+            <small class="err" data-err="deathDate"></small>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="f-photo">宠物照片 <span class="req">*</span></label>
+          <div class="photo-picker" id="photo-picker">
+            <input id="f-photo" name="photo" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+            <div class="photo-empty" id="photo-empty">
+              <span class="photo-plus">＋</span>
+              <span>点击选择一张照片</span>
+              <span class="photo-hint">jpg / png / webp，≤10MB，建议竖版 3:4</span>
+            </div>
+            <img id="photo-preview" class="photo-preview" alt="宠物照片预览" hidden />
+          </div>
+          <small class="err" data-err="photo"></small>
+        </div>
+
+        <div class="field">
+          <label>宠物性别</label>
+          <div class="radio-row" id="gender-row">
+            <label class="radio"><input type="radio" name="gender" value="male" /><span>男</span></label>
+            <label class="radio"><input type="radio" name="gender" value="female" /><span>女</span></label>
+            <label class="radio"><input type="radio" name="gender" value="secret" checked /><span>保密</span></label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="f-breed">宠物品种</label>
+          <input id="f-breed" name="breed" type="text" maxlength="20" placeholder="选填，如：中华田园犬" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="f-words">想对它说的话</label>
+          <textarea id="f-words" name="words" rows="3" maxlength="500" placeholder="选填，仪式结束后会自动写入第一条留言"></textarea>
+          <small class="err" data-err="words"></small>
+        </div>
+
+        <button type="button" id="btn-start" class="btn-primary">开始告别仪式</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- ========== 视图二：告别仪式（全屏沉浸） ========== -->
+  <section id="view-ceremony" class="view" hidden>
+    <canvas id="ceremony-canvas"></canvas>
+    <div id="ceremony-photo-layer"></div>
+    <div id="ceremony-vignette" aria-hidden="true"></div>
+
+    <p id="ceremony-caption" class="ceremony-caption" hidden></p>
+
+    <button id="ceremony-btn" class="ceremony-btn" hidden></button>
+
+    <button id="ceremony-back" class="ceremony-back" title="返回上一步" aria-label="返回上一步">‹ 上一步</button>
+    <button id="ceremony-skip" class="ceremony-skip" title="跳过仪式" aria-label="跳过仪式">跳过</button>
+    <button id="ceremony-audio" class="ceremony-audio" aria-label="环境音开关" aria-pressed="false">🔇</button>
+  </section>
+
+  <!-- ========== 视图三：纪念馆首页 ========== -->
+  <section id="view-memorial" class="view" hidden>
+    <header class="top-bar" id="top-bar">
+      <span class="tb-left">🐾 <b id="tb-petname">它</b></span>
+      <span class="tb-center" id="tb-days">已经离开 0 天</span>
+      <span class="tb-actions">
+        <button class="tb-right" id="btn-bgm" aria-label="背景音乐开关" aria-pressed="true">🔊</button>
+        <button class="tb-right" id="btn-settings" aria-label="设置">⚙</button>
+      </span>
+    </header>
+
+    <div id="anniv-banner" class="anniv-banner" hidden></div>
+
+    <main class="memorial-stage">
+      <canvas id="memorial-canvas"></canvas>
+      <!-- 墓碑放大特写态的收回按钮 -->
+      <button id="memorial-zoom-btn" class="memorial-zoom-btn" hidden>放回坟冢</button>
+    </main>
+
+    <div class="incense-area">
+      <button id="btn-light" class="btn-light">🔥 上香</button>
+      <p class="incense-stat" id="incense-stat">已连续上香 0 天 · 累计 0 天</p>
+            <p class="incense-hint">🕯 香火每天都可以重新点燃，明天也记得来陪它一会儿</p>
+    </div>
+
+    <nav class="bottom-bar">
+      <button class="bb-btn" data-action="message">💬<span>留言寄思</span></button>
+      <button class="bb-btn" data-action="photos">🖼<span>照片墙</span></button>
+      <button class="bb-btn" data-action="candle">🕯<span>点蜡烛</span></button>
+    </nav>
+  </section>
+
+  <!-- ========== 抽屉：留言 ========== -->
+  <div class="drawer-mask" id="drawer-mask" hidden></div>
+  <aside class="drawer" id="drawer-message" hidden>
+    <div class="drawer-head">
+      <h2>思念卷轴</h2>
+      <button class="drawer-close" data-close="drawer-message" aria-label="关闭">✕</button>
+    </div>
+    <div class="drawer-body">
+      <textarea id="msg-input" rows="3" maxlength="500" placeholder="此刻，你想对它说些什么…"></textarea>
+      <button id="msg-send" class="btn-primary btn-sm">写下思念</button>
+      <ul id="msg-list" class="msg-list"></ul>
+    </div>
+  </aside>
+
+  <!-- ========== 抽屉：照片墙 ========== -->
+  <aside class="drawer" id="drawer-photos" hidden>
+    <div class="drawer-head">
+      <h2>照片墙</h2>
+      <button class="drawer-close" data-close="drawer-photos" aria-label="关闭">✕</button>
+    </div>
+    <div class="drawer-body">
+      <label class="btn-primary btn-sm upload-btn">
+        ＋ 添加照片<input id="photo-add" type="file" accept="image/*" multiple hidden />
+      </label>
+      <div id="photo-grid" class="photo-grid"></div>
+    </div>
+  </aside>
+
+  <!-- ========== 抽屉：设置 ========== -->
+  <aside class="drawer" id="drawer-settings" hidden>
+    <div class="drawer-head">
+      <h2>设置与数据</h2>
+      <button class="drawer-close" data-close="drawer-settings" aria-label="关闭">✕</button>
+    </div>
+    <div class="drawer-body" id="settings-body"></div>
+  </aside>
+
+  <!-- ========== 照片大图预览 ========== -->
+  <div class="lightbox" id="lightbox" hidden>
+    <img id="lightbox-img" alt="照片大图" />
+    <button class="lb-close" id="lb-close" aria-label="关闭">✕</button>
+    <button class="lb-nav lb-prev" id="lb-prev" aria-label="上一张">‹</button>
+    <button class="lb-nav lb-next" id="lb-next" aria-label="下一张">›</button>
+  </div>
+
+  <!-- ========== 通用弹窗 ========== -->
+  <div class="modal-mask" id="modal-mask" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <p class="modal-text" id="modal-text"></p>
+      <div class="modal-input-wrap" id="modal-input-wrap" hidden>
+        <input id="modal-input" type="text" autocomplete="off" />
+      </div>
+      <div class="modal-actions">
+        <button id="modal-cancel" class="btn-ghost">取消</button>
+        <button id="modal-ok" class="btn-primary btn-sm">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 轻提示 ========== -->
+  <div id="toast" class="toast" hidden></div>
+
+  <!-- 经典脚本按依赖顺序加载（保证 file:// 双击可运行） -->
+  <script src="js/utils/date.js"></script>
+  <script src="js/utils/image.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/assets.js"></script>
+  <script src="js/fx/particle.js"></script>
+  <script src="js/fx/fire.js"></script>
+  <script src="js/fx/ash.js"></script>
+  <script src="js/fx/soil.js"></script>
+  <script src="js/fx/incense.js"></script>
+  <script src="js/ceremony/scene.js"></script>
+  <script src="js/ceremony/acts.js"></script>
+  <script src="js/ceremony/director.js"></script>
+  <script src="js/pages/form.js"></script>
+  <script src="js/pages/memorial.js"></script>
+  <script src="js/pages/settings.js"></script>
+  <script src="js/main.js"></script>
 </body>
 </html>

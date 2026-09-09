@@ -1,0 +1,240 @@
+/* =========================================================
+   pages.css —— 信息填写页 / 纪念馆首页 / 抽屉内容 样式
+   ========================================================= */
+
+/* ================= 信息填写页 ================= */
+#view-form {
+  overflow-y: auto;
+  align-items: center;
+  padding: calc(24px + var(--safe-t)) 16px calc(24px + var(--safe-b));
+}
+.form-card {
+  width: 100%;
+  max-width: 480px;
+  margin: auto;
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+.form-title {
+  margin: 0; text-align: center; font-family: var(--font-stele);
+  font-size: 26px; font-weight: 600; color: var(--c-gold-soft); letter-spacing: 2px;
+}
+.form-sub {
+  margin: 6px 0 22px; text-align: center; font-size: 13px; color: var(--c-text-mute);
+}
+
+.field { margin-bottom: 16px; }
+.field-row { display: flex; gap: 12px; }
+/* min-width:0 解除 flex 项的 min-content 下限，避免 date 输入在窄屏撞出横向溢出 */
+.field-row .field { flex: 1; min-width: 0; }
+.field label {
+  display: block; margin-bottom: 6px; font-size: 13px; color: var(--c-text-dim);
+}
+.req { color: var(--c-warm); }
+.field input[type="text"],
+.field input[type="date"],
+.field textarea {
+  width: 100%; min-width: 0; padding: 11px 12px; font-size: 16px; /* ≥16px 防 iOS 缩放 */
+  color: var(--c-text); background: var(--c-bg-2);
+  border: 1px solid var(--c-line); border-radius: var(--radius-sm);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  font-family: inherit;
+}
+.field textarea { resize: vertical; min-height: 68px; }
+.field input:focus, .field textarea:focus {
+  outline: none; border-color: var(--c-gold);
+  box-shadow: 0 0 0 3px rgba(216, 181, 106, 0.14);
+}
+.field input[type="date"] { color-scheme: dark; }
+.field.invalid input, .field.invalid textarea, .field.invalid .photo-picker {
+  border-color: var(--c-danger);
+  box-shadow: 0 0 0 3px rgba(217, 139, 122, 0.14);
+}
+.err { display: block; min-height: 16px; margin-top: 4px; font-size: 12px; color: var(--c-danger); }
+
+/* 照片选择器 */
+.photo-picker {
+  position: relative; width: 100%; aspect-ratio: 3 / 4; max-height: 260px;
+  border: 1px dashed var(--c-line); border-radius: var(--radius-sm);
+  background: var(--c-bg-2); cursor: pointer; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.2s;
+}
+.photo-picker:hover { border-color: var(--c-gold); }
+.photo-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--c-text-mute); font-size: 13px; }
+.photo-plus { font-size: 30px; color: var(--c-gold); line-height: 1; }
+.photo-hint { font-size: 11px; color: var(--c-text-mute); opacity: 0.7; }
+.photo-preview { width: 100%; height: 100%; object-fit: cover; }
+
+/* 性别单选 */
+.radio-row { display: flex; gap: 10px; }
+.radio {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px; border: 1px solid var(--c-line); border-radius: var(--radius-sm);
+  background: var(--c-bg-2); cursor: pointer; font-size: 14px; color: var(--c-text-dim);
+  transition: all 0.2s;
+}
+.radio input { accent-color: var(--c-gold); }
+.radio:has(input:checked) { border-color: var(--c-gold); color: var(--c-gold-soft); background: rgba(216,181,106,0.08); }
+
+#btn-start { margin-top: 8px; }
+
+/* ================= 纪念馆首页 ================= */
+#view-memorial { display: flex; flex-direction: column; }
+
+.top-bar {
+  flex: 0 0 auto; z-index: 5;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: calc(10px + var(--safe-t)) 16px 10px;
+  background: linear-gradient(180deg, rgba(8,11,20,0.82), rgba(8,11,20,0));
+}
+.tb-left {
+  font-size: 15px; color: var(--c-gold-soft); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 38vw;
+}
+.tb-left b { font-weight: 600; }
+.tb-center { font-size: 14px; color: var(--c-text-dim); text-align: center; flex: 1; min-width: 0; }
+.tb-right {
+  border: none; background: rgba(255,255,255,0.06); color: var(--c-text-dim);
+  width: 36px; height: 36px; border-radius: 50%; font-size: 17px; cursor: pointer;
+}
+.tb-right:hover { color: var(--c-text); background: rgba(255,255,255,0.12); }
+.tb-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+
+.anniv-banner {
+  z-index: 5; margin: 0 16px 8px; padding: 10px 14px;
+  text-align: center; font-size: 13px; color: var(--c-gold-soft);
+  background: rgba(216,181,106,0.1); border: 1px solid rgba(216,181,106,0.25);
+  border-radius: var(--radius-sm);
+}
+.anniv-banner[hidden] { display: none; }
+
+.memorial-stage { flex: 1 1 auto; position: relative; min-height: 0; }
+/* 画布铺满视口：坟冢/碑的地平线与背景草地对齐；可点击（点碑放大）；UI 层 z-index 5 在其上 */
+#memorial-canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; z-index: 1; pointer-events: auto; }
+
+/* 墓碑放大特写态：顶部居中胶囊按钮（不遮碑与香炉区） */
+.memorial-zoom-btn {
+  position: fixed; z-index: 6;
+  top: calc(72px + var(--safe-t, env(safe-area-inset-top, 0px)));
+  left: 50%; transform: translateX(-50%);
+  padding: 9px 24px; font-size: 14px; font-weight: 600;
+  color: var(--c-gold-soft); background: rgba(20, 22, 34, 0.72);
+  border: 1px solid rgba(216, 181, 106, 0.45); border-radius: 999px;
+  cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.memorial-zoom-btn[hidden] { display: none; }
+
+.incense-area {
+  flex: 0 0 auto; z-index: 5; text-align: center;
+  padding: 6px 16px 10px;
+}
+.btn-light {
+  min-width: 160px; padding: 12px 28px; font-size: 16px; font-weight: 600;
+  border: none; border-radius: 999px; cursor: pointer; color: #2a2110;
+  background: linear-gradient(180deg, #ffb347, var(--c-warm));
+  box-shadow: 0 6px 24px rgba(255,140,66,0.3);
+  transition: transform 0.15s var(--ease-soft), box-shadow 0.2s, filter 0.2s;
+}
+.btn-light:hover:not(:disabled) { transform: translateY(-1px); }
+.btn-light:disabled {
+  background: #2a2f42; color: #6b7086; box-shadow: none; cursor: not-allowed;
+}
+.incense-stat { margin: 8px 0 0; font-size: 12px; color: var(--c-text-mute); }
+.incense-hint {
+  margin: 6px auto 0; font-size: 12px; color: var(--c-gold-soft);
+  background: rgba(216,181,106,0.10); border: 1px solid rgba(216,181,106,0.25);
+  padding: 4px 14px; border-radius: 999px; display: table; max-width: 90vw;
+}
+
+/* 移动端：香火区固定到底栏上方，不压墓碑/香炉画布区；空白处不挡点碑 */
+@media (max-width: 768px) {
+  .incense-area {
+    position: fixed; left: 0; right: 0; z-index: 5;
+    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    padding: 0 16px 4px;
+    pointer-events: none;
+  }
+  .incense-area > * { pointer-events: auto; }
+  .incense-area .btn-light { min-width: 120px; padding: 8px 18px; font-size: 14px; }
+  .incense-area .incense-stat { margin-top: 4px; font-size: 11px; }
+  /* 移动端恢复“每天可重新点燃”提示：紧凑单行 + 点击穿透，不遮画布不挡点碑 */
+  .incense-area .incense-hint {
+    margin-top: 3px; font-size: 10px; padding: 2px 10px;
+    max-width: 92vw; pointer-events: none;
+  }
+}
+
+.bottom-bar {
+  flex: 0 0 auto; z-index: 5;
+  display: flex; gap: 8px; justify-content: space-around;
+  padding: 10px 12px calc(12px + var(--safe-b));
+  background: linear-gradient(0deg, rgba(8,11,20,0.9), rgba(8,11,20,0));
+}
+.bb-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 4px; min-height: 48px;
+  border: 1px solid var(--c-line); border-radius: var(--radius-sm);
+  background: rgba(22,28,46,0.7); color: var(--c-text-dim);
+  font-size: 20px; cursor: pointer; transition: all 0.2s;
+}
+.bb-btn span { font-size: 11px; }
+.bb-btn:hover { color: var(--c-gold-soft); border-color: rgba(216,181,106,0.4); }
+.bb-btn.active { color: var(--c-gold-soft); border-color: var(--c-gold); background: rgba(216,181,106,0.1); }
+
+/* ================= 抽屉内容 ================= */
+#msg-input, .drawer textarea {
+  width: 100%; padding: 11px 12px; font-size: 16px; font-family: inherit;
+  color: var(--c-text); background: var(--c-bg-2);
+  border: 1px solid var(--c-line); border-radius: var(--radius-sm); resize: vertical;
+}
+#msg-send { margin: 10px 0 18px; }
+.msg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.msg-item {
+  padding: 12px 14px; background: var(--c-bg-2); border: 1px solid var(--c-line);
+  border-radius: var(--radius-sm); position: relative;
+}
+.msg-item p { margin: 0 0 6px; font-size: 14px; color: var(--c-text); white-space: pre-wrap; word-break: break-word; }
+.msg-item time { font-size: 11px; color: var(--c-text-mute); }
+.msg-del {
+  position: absolute; top: 8px; right: 8px; border: none; background: transparent;
+  color: var(--c-text-mute); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px;
+}
+.msg-del:hover { color: var(--c-danger); background: rgba(255,255,255,0.05); }
+.empty-tip { text-align: center; color: var(--c-text-mute); font-size: 13px; padding: 24px 0; }
+
+.upload-btn { margin-bottom: 16px; cursor: pointer; }
+.photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.photo-cell {
+  position: relative; aspect-ratio: 1; border-radius: var(--radius-sm); overflow: hidden;
+  border: 1px solid var(--c-line); cursor: pointer; background: var(--c-bg-2);
+}
+.photo-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-cell .badge-main {
+  position: absolute; top: 4px; left: 4px; font-size: 10px; padding: 2px 6px;
+  background: rgba(216,181,106,0.9); color: #2a2110; border-radius: 4px;
+}
+
+/* 设置面板 */
+.set-group { margin-bottom: 20px; }
+.set-group h3 { margin: 0 0 10px; font-size: 13px; color: var(--c-gold-soft); font-weight: 600; letter-spacing: 1px; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--c-line); }
+.set-row:last-child { border-bottom: none; }
+.set-row .label { font-size: 14px; color: var(--c-text-dim); }
+.set-row .val { font-size: 13px; color: var(--c-text-mute); }
+.set-actions { display: flex; flex-direction: column; gap: 10px; }
+.set-actions .btn-primary.btn-sm, .set-actions .btn-ghost { width: 100%; text-align: center; }
+.btn-danger { border-color: rgba(217,139,122,0.4); color: var(--c-danger); }
+.btn-danger:hover { background: rgba(217,139,122,0.1); }
+.space-bar { height: 8px; border-radius: 4px; background: var(--c-bg-2); overflow: hidden; margin-top: 6px; }
+.space-fill { height: 100%; background: linear-gradient(90deg, var(--c-gold), var(--c-warm)); }
+
+/* 手机端底部悬浮栏已由 flex 布局固定在底部 */
+@media (max-width: 768px) {
+  .photo-grid { grid-template-columns: repeat(3, 1fr); }
+  .form-card { padding: 22px 18px; }
+}

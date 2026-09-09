@@ -1,0 +1,9 @@
+[
+  {
+    "src": "chroma_pet_mound2_1788768434.png",
+    "out": "mound",
+    "max": 640,
+    "fadeBottom": 0.42,
+    "wipes": [ [0.86, 0.955, 1.0, 1.0] ]
+  }
+]
