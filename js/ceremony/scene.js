@@ -229,6 +229,9 @@ PM.Scene = (function () {
   }
 
   // ===== 香炉+三炷香共享规则（纪念馆与仪式幕7 调用同一段代码，结构上杜绝两边不一致）=====
+  // 素材沙面中心在图高 26.4% 处（对新香炉素材实测）→ 换算为盒中心偏移 0.236dh；
+  // 插点/烟发射点锚在素材真实沙面，香头冒烟位置幕7 与纪念馆天然一致
+  var SAND_F = 0.236;
 
   // 炉口插点纯计算（与 drawBurner 素材/降级两分支返回值完全一致）
   function burnerMouth(L) {
@@ -238,8 +241,7 @@ PM.Scene = (function () {
       var ir = (img.naturalWidth || w) / (img.naturalHeight || h);
       var dh = h, dw = dh * ir;
       if (dw > w) { dw = w; dh = dw / ir; }
-      // 新素材自带炉口沙堆：不再叠画代码沙面；插点=沙堆面（距顶约 14% 高）
-      return { mouthX: x, mouthY: y - dh * 0.36, mouthR: dw * 0.40 };
+      return { mouthX: x, mouthY: y - dh * SAND_F, mouthR: dw * 0.30 };
     }
     return { mouthX: x, mouthY: y - h * 0.4, mouthR: w * 0.40 };
   }
@@ -294,9 +296,11 @@ PM.Scene = (function () {
       var dh = h, dw = dh * ir;
       if (dw > w) { dw = w; dh = dw / ir; }
       ctx.drawImage(img, x - dw / 2, y - dh / 2, dw, dh);
+      // 素材自带沙面：不再叠加代码沙盘，避免浮在素材沙面之上造成插点/冒烟错位
+      var sandY = y - dh * SAND_F;
       ctx.restore();
-      // 素材自带炉口沙堆（三炷香插进沙里）：插点=沙堆面，mouthR=沙面半径（外部据此约束香间距不超炉缘）
-      return { mouthX: x, mouthY: y - dh * 0.36, mouthR: dw * 0.40 };
+      // 香插入点：沙面中心；mouthR = 沙面半径（外部据此约束香间距不超炉缘）
+      return { mouthX: x, mouthY: sandY, mouthR: dw * 0.30 };
     }
     // 降级：代码绘制
     ctx.save();

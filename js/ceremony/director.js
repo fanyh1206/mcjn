@@ -230,7 +230,8 @@ PM.Director = (function () {
     bgLayer = el("bg-layer");
 
     system = new PM.FX.System({ reducedMotion: data.settings && data.settings.reducedMotion });
-    incense = PM.FX.createIncense({ system: system, height: 90, spacing: 22 });
+    // 仪式幕焚香祭拜后不冒烟（smoke:false，只留香头燃点微光）；纪念馆上香仍保留烟特效
+    incense = PM.FX.createIncense({ system: system, height: 90, spacing: 22, smoke: false });
 
     view.hidden = false;
     resize();

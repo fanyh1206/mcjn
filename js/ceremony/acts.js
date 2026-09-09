@@ -142,10 +142,11 @@ PM.Acts = (function () {
       if (lidImg && lidClose > 0) {
         ctx.globalAlpha = Math.min(1, lidClose * 1.4);
         var lr = (lidImg.naturalWidth || w) / (lidImg.naturalHeight || h);
-        var lw = w * 1.02, lh = lw / lr;
+        // 合拢时盖略宽于棺体（盖缘伸出棺侧，遮住盖底弧线两端露出的口沿），敞开时恢复 1.02 便于滑入
+        var lw = w * (1.02 + 0.04 * lidClose), lh = lw / lr;
         var off = (1 - lidClose) * w * 0.5;
-        // 合拢时盖底缘下压棺体高度 28%（盖住侧视素材的口沿+白缎内衬），水平盖紧无缝隙；敞开时盖抬起并从右滑入
-        var lidY = -dh - lh + dh * 0.28 - (1 - lidClose) * dh * 1.1;
+        // 合拢时盖底缘下压棺体高度 38%（盖住俯侧素材的口沿+白缎内衬），水平盖紧严丝合缝；敞开时盖抬起并从右滑入
+        var lidY = -dh - lh + dh * (0.28 + 0.10 * lidClose) - (1 - lidClose) * dh * 1.1;
         ctx.drawImage(lidImg, -lw / 2 + off, lidY, lw, lh);
       }
       ctx.restore();
@@ -551,9 +552,9 @@ PM.Acts = (function () {
           C.markIncenseLit();
         }
       }
-      // 香炉到位后持续更新香与烟：先用纪念馆同款共享规则对齐插点/间距/香长
+      // 香炉到位后持续更新香：先用纪念馆同款共享规则对齐插点/间距/香长
       //（炉 1.3 倍+炉底对齐碑底，香长系数 0.11=纪念馆特写态），再 update——
-      // 烟发射点永远在香头火光处，与纪念馆结构上同一段代码
+      // 仪式幕不冒烟（创建时 smoke:false），只留香头燃点呼吸微光
       if (this._burner >= 1) {
         var LBu = PM.Scene.burnerLayout(L, 1.3, true);
         PM.Scene.alignIncense(C.incense, LBu, 0.11);

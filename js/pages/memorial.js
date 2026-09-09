@@ -130,6 +130,9 @@ PM.Memorial = (function () {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     // 坟冢前小碑形态：与仪式幕同参数，同一座坟；冢底渐隐沉入草面
     layout = PM.Scene.computeLayout(W, H, true, 0.70);
+    // 缩小态香炉整体再上移一点（贴近碑底/新土堆）：只改缩小态端点，放大特写态不受影响；
+    // 不动共享 computeLayout，仪式幕7 炉位保持现状
+    layout.burnerY -= Math.round(layout.steleW * 0.12);
     // 特写下香炉适度放大（1.3 倍）+炉底对齐碑底：与仪式幕7 同走共享规则 burnerLayout
     zoomLayout = PM.Scene.burnerLayout(PM.Scene.computeLayout(W, H, false, 0.70), 1.3, true);
     incense.setPosition(layout.burnerX, layout.burnerY - layout.burnerH * 0.22);
@@ -158,11 +161,9 @@ PM.Memorial = (function () {
     if (Date.now() > candle.until) { candle.on = false; return; }
     var y = L.groundY + 6;
     var h = L.steleH * 0.12, w = h * 0.28;
-    // 墓碑左右绝对对称：碑缘外等距 gap（放大/缩回两态都在碑体外侧，不贴碑面）
-    var gap = Math.max(14, L.steleW * 0.18);
     // 墓碑左右对称各一支蜡烛（side=-1 左 / +1 右）
     [-1, 1].forEach(function (side) {
-      var x = L.cx + side * (L.steleW / 2 + gap);
+      var x = L.burnerX + side * L.burnerW * 0.9;
       ctx.save();
       ctx.fillStyle = "#e8dcc0";
       PM.Scene.roundRect(ctx, x - w / 2, y - h, w, h, w * 0.3);
