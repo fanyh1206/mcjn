@@ -75,6 +75,12 @@ PM.Assets = (function () {
     return !!loaded[key];
   }
 
+  // 素材是否已出结果（成功或彻底失败）；加载中返回 false，供绘制端跳过降级代码画，
+  // 避免素材异步加载完成前先闪现代码绘制的旧图形
+  function ready(key) {
+    return loaded[key] !== undefined;
+  }
+
   // 在 Canvas 上绘制素材（居中于 x,y，按 scale 缩放），不可用时返回 false
   function draw(ctx, key, x, y, w, h) {
     var img = get(key);
@@ -91,6 +97,7 @@ PM.Assets = (function () {
     preloadAll: preloadAll,
     get: get,
     has: has,
+    ready: ready,
     draw: draw
   };
 })();

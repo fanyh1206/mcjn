@@ -93,7 +93,15 @@ PM.Director = (function () {
     },
     next: function () { goto(index + 1); },
     finish: function () { finish(); },
-    markIncenseLit: function () { /* 由 finish 统一提交点燃数据 */ }
+    markIncenseLit: function () { /* 由 finish 统一提交点燃数据 */ },
+    // 音效挂点：one=单次、loop=循环句柄（setGain 随动画强度）；静音由 sfxMaster 统一处理，此处不判开关
+    sfx: {
+      one: function (name, gain) { if (PM.Audio) PM.Audio.one(name, gain); },
+      loop: function (name, gain) {
+        if (PM.Audio) return PM.Audio.loop(name, gain);
+        return { setGain: function () {}, stop: function () {} };
+      }
+    }
   };
 
   // ---------- 画布尺寸 ----------
@@ -132,6 +140,16 @@ PM.Director = (function () {
     var act = acts[index];
     // 进入新幕
     if (act.enter) act.enter.call(act, C);
+    warmNext();
+  }
+
+  // 提前预热下一幕素材（如幕4 期间加载幕5 棺材）：绘制端虽有 ready 门控不闪现降级画，
+  // 预热可让素材在切幕前就绪、直接以图片形态出现
+  var warmIdx = -1;
+  function warmNext() {
+    if (index + 1 === warmIdx) return;
+    warmIdx = index + 1;
+    PM.Assets.preloadForAct(index + 2);
   }
 
   function saveProgress() {
@@ -202,12 +220,12 @@ PM.Director = (function () {
     if (onBackCb) onBackCb();
   }
 
-  // ---------- 音频开关（无本地音频文件时仅切换图标） ----------
+  // ---------- 音频开关（环境音+音效同控） ----------
   function toggleAudio() {
     audioOn = !audioOn;
     audioEl.textContent = audioOn ? "🔊" : "🔇";
     audioEl.setAttribute("aria-pressed", audioOn ? "true" : "false");
-    if (PM.Audio) PM.Audio.setAmbient(audioOn);
+    if (PM.Audio) { PM.Audio.setAmbient(audioOn); PM.Audio.setSfx(audioOn); }
   }
 
   // ---------- 启动 ----------
@@ -233,6 +251,12 @@ PM.Director = (function () {
     // 仪式幕焚香祭拜后不冒烟（smoke:false，只留香头燃点微光）；纪念馆上香仍保留烟特效
     incense = PM.FX.createIncense({ system: system, height: 90, spacing: 22, smoke: false });
 
+    // 声音默认开：环境音+各幕音效（右上角喇叭可随时静音）；被 autoplay 拦截时由 unlock 补播
+    audioOn = true;
+    audioEl.textContent = "🔊";
+    audioEl.setAttribute("aria-pressed", "true");
+    if (PM.Audio) { PM.Audio.setAmbient(true); PM.Audio.setSfx(true); }
+
     view.hidden = false;
     resize();
 
@@ -253,9 +277,11 @@ PM.Director = (function () {
     index = Math.max(0, Math.min(acts.length - 1, step - 1));
     finished = false;
     last = 0; time = 0;
+    warmIdx = -1;
     PM.Assets.preloadForAct(step);
     var act = acts[index];
     if (act.enter) act.enter.call(act, C);
+    warmNext();
     saveProgress();
     raf = requestAnimationFrame(frame);
   }
@@ -281,6 +307,8 @@ PM.Director = (function () {
     if (raf) cancelAnimationFrame(raf);
     raf = null;
     C.clearTimers();
+    // 离场即停所有循环音效（防漏到纪念馆/填写页）
+    if (PM.Audio) PM.Audio.stopLoops();
     window.removeEventListener("keydown", onKey);
     window.removeEventListener("resize", onResize);
     window.removeEventListener("orientationchange", onResize);
@@ -288,3 +316,8 @@ PM.Director = (function () {
 
   return { start: start, stop: stop, requestSkip: requestSkip, back: back };
 })();
+
+// 首次手势解锁 WebAudio/环境音（autoplay 策略；捕获阶段保证先于业务点击）
+document.addEventListener("pointerdown", function () {
+  if (window.PM && PM.Audio && PM.Audio.unlock) PM.Audio.unlock();
+}, true);

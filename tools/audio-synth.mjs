@@ -118,4 +118,221 @@ function bell(out, t0, freq, amp, decay) {
   writeFileSync(join(OUT, 'bgm.wav'), encodeWav(out));
   console.log('✅ bgm.wav', D + 's', (encodeWav(out).length / 1024).toFixed(0) + 'KB');
 }
-console.log('完成。index.html 需 <audio id="ambient"|"bgm" loop preload="none"> 接入。');
+/* ---------------- SFX 通用工具 ---------------- */
+function noiseArr(n, amp) { const a = new Float64Array(n); for (let i = 0; i < n; i++) a[i] = (rnd() * 2 - 1) * amp; return a; }
+function lpPass(x, cutoff) { const a = Math.min(1, 2 * Math.PI * cutoff / SR); const y = new Float64Array(x.length); let p = 0; for (let i = 0; i < x.length; i++) { p += a * (x[i] - p); y[i] = p; } return y; }
+function hpPass(x, cutoff) { const l = lpPass(x, cutoff); const y = new Float64Array(x.length); for (let i = 0; i < x.length; i++) y[i] = x[i] - l[i]; return y; }
+function addAt(out, src, t0, gain) { const s = Math.round(t0 * SR); for (let i = 0; i < src.length; i++) { const o = s + i; if (o >= 0 && o < out.length) out[o] += src[i] * gain; } }
+// 滑音正弦 + 指数衰减（one-shot 用，不需谐波对齐）
+function sineDecay(dur, f0, f1, decay, amp) {
+  const n = Math.round(dur * SR); const y = new Float64Array(n); let ph = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / SR;
+    const f = f0 + (f1 - f0) * Math.min(1, t / Math.max(0.05, dur * 0.6));
+    ph += 2 * Math.PI * f / SR;
+    y[i] = amp * Math.exp(-t / decay) * Math.sin(ph);
+  }
+  return y;
+}
+// 高频噪声短爆（爆裂/碎屑/擦划颗粒），loop 内收敛不跨循环点
+function crackle(out, t0, dur, hpHz, amp) {
+  const m = Math.round(dur * SR);
+  const b = hpPass(noiseArr(m, 1), hpHz);
+  for (let i = 0; i < m; i++) b[i] *= Math.exp(-(i / SR) / (dur * 0.35));
+  addAt(out, b, t0, amp);
+}
+function norm(x, peak) { let pk = 0; for (let i = 0; i < x.length; i++) pk = Math.max(pk, Math.abs(x[i])); if (pk > 0) for (let i = 0; i < x.length; i++) x[i] = x[i] / pk * peak; return x; }
+// one-shot 尾部淡出，杜绝 BufferSource 结束咔哒；loop 禁用（靠谐波对齐无缝）
+function fadeTail(x, sec) { const m = Math.min(x.length, Math.round(sec * SR)); for (let i = 0; i < m; i++) x[x.length - 1 - i] *= i / m; return x; }
+function writeSfx(name, x, D) {
+  writeFileSync(join(OUT, name + '.wav'), encodeWav(x));
+  console.log('✅ ' + name + '.wav', D + 's', (encodeWav(x).length / 1024).toFixed(0) + 'KB');
+}
+
+/* ---------------- SFX：火焰燃烧 loop 3s（幕2/幕3 循环床） ---------------- */
+{
+  const D = 3, n = Math.round(SR * D), out = new Float64Array(n);
+  const parts = [];
+  for (let k = 1; k <= 36; k++) parts.push({ f: k / D * 2, amp: 0.05 / Math.pow(k, 0.85), lfoHz: Math.ceil(rnd() * 3) / D, lfoDepth: 0.4 });
+  const roar = makeTrack(D, parts);
+  for (let i = 0; i < n; i++) out[i] += roar[i];
+  const hiss = lpPass(noiseArr(n, 1), 900);
+  for (let i = 0; i < n; i++) {
+    const t = i / SR;
+    out[i] += hiss[i] * 0.05 * (0.7 + 0.3 * Math.sin(2 * Math.PI * (2 / D) * t + 2.0));
+  }
+  for (let p = 0; p < 110; p++) crackle(out, rnd() * (D - 0.06), 0.008 + rnd() * 0.02, 1800 + rnd() * 2500, 0.10 + Math.pow(rnd(), 2) * 0.5);
+  writeSfx('fire_loop', norm(out, 0.6), D);
+}
+
+/* ---------------- SFX：点火 whoosh 1.4s（幕2 进入） ---------------- */
+{
+  const D = 1.4, n = Math.round(SR * D), out = new Float64Array(n);
+  const n1 = lpPass(noiseArr(n, 1), 500), n2 = lpPass(noiseArr(n, 1), 2400);
+  for (let i = 0; i < n; i++) {
+    const t = i / SR;
+    const k = Math.min(1, t / 0.5);
+    const env = Math.min(1, t / 0.18) * Math.exp(-Math.max(0, t - 0.5) / 0.8);
+    out[i] += (n1[i] * (1 - k * 0.4) + n2[i] * k * 0.5) * env * 0.5;
+  }
+  for (let i = 0; i < n; i++) {
+    const t = i / SR;
+    out[i] += 0.25 * Math.min(1, t / 0.6) * (Math.sin(2 * Math.PI * 54 * t) + 0.5 * Math.sin(2 * Math.PI * 81 * t)) * Math.exp(-Math.max(0, t - 0.9) / 0.5);
+  }
+  for (let p = 0; p < 8; p++) crackle(out, 0.5 + rnd() * 0.8, 0.01 + rnd() * 0.015, 2000 + rnd() * 2000, 0.12 + rnd() * 0.15);
+  writeSfx('ignite', norm(fadeTail(out, 0.15), 0.7), D);
+}
+
+/* ---------------- SFX：扫灰入罐 1.6s（幕4 sweep 段，三下扫拂） ---------------- */
+{
+  const D = 1.6, n = Math.round(SR * D), out = new Float64Array(n);
+  [0.03, 0.55, 1.07].forEach(function (t0, si) {
+    const dur = 0.42, m = Math.round(dur * SR);
+    let b = hpPass(lpPass(noiseArr(m, 1), 2600), 500);
+    for (let i = 0; i < m; i++) {
+      const t = i / SR, u = i / m;
+      b[i] *= Math.pow(Math.sin(Math.PI * u), 1.5) * (1 + 0.25 * Math.sin(2 * Math.PI * 26 * t + si));
+    }
+    addAt(out, b, t0, 0.8 - si * 0.12);
+    for (let g = 0; g < 10; g++) crackle(out, t0 + 0.05 + rnd() * (dur - 0.1), 0.006 + rnd() * 0.008, 3000 + rnd() * 1500, 0.06 + rnd() * 0.06);
+  });
+  writeSfx('sweep', norm(fadeTail(out, 0.12), 0.5), D);
+}
+
+/* ---------------- SFX：罐盖合 1.0s（幕4 lid 段：瓷盖落位+轻震） ---------------- */
+{
+  const D = 1.0, n = Math.round(SR * D), out = new Float64Array(n);
+  function clink(t0, g) {
+    addAt(out, sineDecay(0.16, 640, 600, 0.05, 0.5), t0, g);
+    addAt(out, sineDecay(0.10, 1280, 1240, 0.035, 0.22), t0, g);
+    addAt(out, sineDecay(0.20, 190, 150, 0.07, 0.5), t0, g);
+  }
+  clink(0.02, 1);
+  clink(0.22, 0.5);
+  crackle(out, 0.30, 0.010, 2500, 0.12);
+  crackle(out, 0.36, 0.009, 2600, 0.08);
+  crackle(out, 0.41, 0.008, 2700, 0.05);
+  writeSfx('urn_lid', norm(fadeTail(out, 0.2), 0.6), D);
+}
+
+/* ---------------- SFX：软落地/覆土拍平 0.8s（通用 one-shot） ---------------- */
+{
+  const D = 0.8, n = Math.round(SR * D), out = new Float64Array(n);
+  addAt(out, sineDecay(0.4, 95, 52, 0.16, 0.8), 0, 1);
+  const puff = lpPass(noiseArr(Math.round(0.14 * SR), 1), 300);
+  for (let i = 0; i < puff.length; i++) puff[i] *= Math.exp(-(i / SR) / 0.05);
+  addAt(out, puff, 0, 0.5);
+  crackle(out, 0.01, 0.012, 2200, 0.15);
+  writeSfx('thud', norm(fadeTail(out, 0.15), 0.65), D);
+}
+
+/* ---------------- SFX：棺盖合拢 1.4s（幕5 close 段：木盖滑移+闷落） ---------------- */
+{
+  const D = 1.4, n = Math.round(SR * D), out = new Float64Array(n);
+  const slide = lpPass(noiseArr(n, 1), 700);
+  for (let i = 0; i < n; i++) {
+    const t = i / SR;
+    const env = Math.min(1, t / 0.15) * (t < 0.62 ? 1 : Math.max(0, 1 - (t - 0.62) / 0.1));
+    out[i] += slide[i] * env * (0.6 + 0.4 * Math.sin(2 * Math.PI * 7 * t)) * 0.22;
+  }
+  addAt(out, sineDecay(0.30, 150, 90, 0.11, 0.7), 0.62, 1);
+  addAt(out, sineDecay(0.12, 330, 300, 0.05, 0.3), 0.62, 1);
+  addAt(out, sineDecay(0.50, 68, 55, 0.20, 0.6), 0.62, 1);
+  addAt(out, sineDecay(0.18, 140, 95, 0.07, 0.25), 0.82, 1);
+  writeSfx('coffin_lid', norm(fadeTail(out, 0.2), 0.65), D);
+}
+
+/* ---------------- SFX：覆土 loop 2s（幕6 cover 段循环床） ---------------- */
+{
+  const D = 2, n = Math.round(SR * D), out = new Float64Array(n);
+  const parts = [];
+  for (let k = 1; k <= 10; k++) parts.push({ f: k / D, amp: 0.035 / Math.pow(k, 0.7) });
+  const rum = makeTrack(D, parts);
+  for (let i = 0; i < n; i++) out[i] += rum[i];
+  for (let g = 0; g < 70; g++) {
+    const dur = 0.03 + rnd() * 0.04;
+    const m = Math.round(dur * SR);
+    let b = lpPass(noiseArr(m, 1), 700 + rnd() * 500);
+    for (let i = 0; i < m; i++) b[i] *= Math.exp(-(i / SR) / (dur * 0.4));
+    addAt(out, b, rnd() * (D - 0.08), 0.08 + rnd() * 0.22);
+  }
+  for (let d = 0; d < 6; d++) addAt(out, sineDecay(0.09, 120, 90, 0.04, 0.25), rnd() * (D - 0.1), 1);
+  writeSfx('soil_loop', norm(out, 0.55), D);
+}
+
+/* ---------------- SFX：石碑升起磨 rumble loop 2.5s（幕7 升起段） ---------------- */
+{
+  const D = 2.5, n = Math.round(SR * D), out = new Float64Array(n);
+  const parts = [];
+  for (let k = 1; k <= 30; k++) parts.push({ f: k / D * 2, amp: 0.07 / Math.pow(k, 0.8), lfoHz: Math.ceil(rnd() * 4) / D, lfoDepth: 0.5 });
+  const grind = makeTrack(D, parts);
+  for (let i = 0; i < n; i++) out[i] += grind[i];
+  const gn = lpPass(noiseArr(n, 1), 240);
+  for (let i = 0; i < n; i++) {
+    const t = i / SR;
+    out[i] += gn[i] * (0.45 + 0.55 * Math.sin(2 * Math.PI * (3 / D) * t + 1.2)) * (0.5 + 0.5 * Math.sin(2 * Math.PI * (1 / D) * t)) * 0.35;
+  }
+  writeSfx('rumble_loop', norm(out, 0.6), D);
+}
+
+/* ---------------- SFX：石碑落定 1.2s（幕7 立稳：重落+碎屑） ---------------- */
+{
+  const D = 1.2, n = Math.round(SR * D), out = new Float64Array(n);
+  addAt(out, sineDecay(0.55, 62, 40, 0.22, 0.9), 0, 1);
+  addAt(out, sineDecay(0.35, 110, 70, 0.12, 0.4), 0, 1);
+  const puff = lpPass(noiseArr(Math.round(0.2 * SR), 1), 260);
+  for (let i = 0; i < puff.length; i++) puff[i] *= Math.exp(-(i / SR) / 0.07);
+  addAt(out, puff, 0, 0.5);
+  for (let d = 0; d < 7; d++) crackle(out, 0.12 + rnd() * 0.6, 0.008 + rnd() * 0.012, 1600 + rnd() * 2000, 0.18 - d * 0.02);
+  writeSfx('stone_set', norm(fadeTail(out, 0.2), 0.7), D);
+}
+
+/* ---------------- SFX：点香 1.6s（幕7 点燃/纪念馆上香：气息+三下火苗+磬） ---------------- */
+{
+  const D = 1.6, n = Math.round(SR * D), out = new Float64Array(n);
+  const air = hpPass(noiseArr(n, 1), 1200);
+  for (let i = 0; i < n; i++) {
+    const t = i / SR;
+    out[i] += air[i] * Math.min(1, t / 0.35) * Math.exp(-Math.max(0, t - 0.4) / 0.5) * 0.18;
+  }
+  [0.12, 0.42, 0.72].forEach(function (t0) {
+    crackle(out, t0, 0.015, 2600, 0.3);
+    addAt(out, sineDecay(0.06, 1500, 1200, 0.02, 0.12), t0, 1);
+  });
+  bell(out, 0.95, 523.25, 0.30, 0.45);
+  bell(out, 0.97, 1046.5, 0.10, 0.3);
+  writeSfx('incense_lit', norm(fadeTail(out, 0.25), 0.55), D);
+}
+
+/* ---------------- SFX：照片放大/香炉升起 气息 1.8s ---------------- */
+{
+  const D = 1.8, n = Math.round(SR * D), out = new Float64Array(n);
+  const air = hpPass(noiseArr(n, 1), 900);
+  for (let i = 0; i < n; i++) {
+    const t = i / SR;
+    out[i] += air[i] * Math.min(1, t / 1.2) * Math.pow(1 - t / D, 1.5) * (0.8 + 0.2 * Math.sin(2 * Math.PI * 5 * t)) * 0.22;
+  }
+  const gl = new Float64Array(n); let ph = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / SR;
+    ph += 2 * Math.PI * (196 + 196 * Math.min(1, t / 1.4)) / SR;
+    gl[i] = Math.sin(ph) * Math.min(1, t / 0.6) * Math.pow(1 - t / D, 1.2) * 0.10;
+  }
+  for (let i = 0; i < n; i++) out[i] += gl[i];
+  [523.25, 659.25, 783.99].forEach(function (f, k) {
+    const s = sineDecay(1.0, f, f, 0.5, 0.03);
+    addAt(out, s, 0.6 + k * 0.12, 1);
+  });
+  writeSfx('swell', norm(fadeTail(out, 0.25), 0.4), D);
+}
+
+/* ---------------- SFX：点蜡烛 0.5s（纪念馆点蜡烛） ---------------- */
+{
+  const D = 0.5, n = Math.round(SR * D), out = new Float64Array(n);
+  crackle(out, 0.02, 0.012, 2400, 0.5);
+  addAt(out, sineDecay(0.05, 1100, 900, 0.02, 0.2), 0.02, 1);
+  const w = hpPass(noiseArr(n, 1), 1000);
+  for (let i = 0; i < n; i++) out[i] += w[i] * Math.exp(-(i / SR) / 0.15) * 0.12;
+  writeSfx('flick', norm(fadeTail(out, 0.1), 0.5), D);
+}
+console.log('完成。index.html 需 <audio id="ambient"|"bgm" loop preload="none"> 接入；音效 wav 由 PM.Audio WebAudio 按需 fetch。');

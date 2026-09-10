@@ -495,6 +495,7 @@ PM.Memorial = (function () {
     data.settings.bgmTouched = true;
     PM.Store.save(data);
     if (PM.Audio) PM.Audio.setBgm(data.settings.bgmEnabled);
+    if (PM.Audio) PM.Audio.setSfx(data.settings.bgmEnabled);   // 纪念馆音效随声音开关
     syncBgmBtn();
     PM.UI.toast(data.settings.bgmEnabled ? "已开启背景音乐" : "已关闭背景音乐");
   }
@@ -525,6 +526,7 @@ PM.Memorial = (function () {
     if (data.settings.bgmTouched !== true) data.settings.bgmEnabled = true;
     syncBgmBtn();
     if (data.settings.bgmEnabled && PM.Audio) PM.Audio.setBgm(true);
+    if (PM.Audio) PM.Audio.setSfx(!!data.settings.bgmEnabled);
     // 每日香火提示：今日未上香时 toast 提醒一次
     if (!isLit()) {
       setTimeout(function () {
@@ -537,6 +539,8 @@ PM.Memorial = (function () {
     visible = false;
     stopLoop();
     if (PM.Audio) PM.Audio.setBgm(false);
+    if (PM.Audio) PM.Audio.setSfx(false);
+    if (PM.Audio) PM.Audio.stopLoops();
     clearTimeout(endOfDayTimer);
     clearInterval(pollTimer);
   }

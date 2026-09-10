@@ -118,20 +118,122 @@ PM.UI = (function () {
   };
 })();
 
-/* ---------------- 音频桩（无本地音频文件时静默） ---------------- */
+/* ---------------- 音频：环境音/BGM（<audio loop>）+ 音效（WebAudio 按需 fetch 解码） ----------------
+   音效静音不走 pause：sfxMaster 增益归 0，循环句柄继续跑 → 中途取消静音立即恢复，
+   各幕无需重启循环。autoplay 策略：首次 pointerdown 统一 unlock。 */
 PM.Audio = (function () {
   var ambient = null, bgm = null;
+  var wantAmbient = false, wantBgm = false;
+  var ctx = null, sfxMaster = null;
+  var buffers = {}, loading = {};
+  var liveLoops = [];
+
   function tryPlay(a) { if (a) { var p = a.play(); if (p && p.catch) p.catch(function () {}); } }
+
+  function ensureCtx() {
+    if (!ctx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ctx = new AC();
+      sfxMaster = ctx.createGain();
+      sfxMaster.gain.value = 0.9;
+      sfxMaster.connect(ctx.destination);
+    }
+    if (ctx.state === "suspended") { var p = ctx.resume(); if (p && p.catch) p.catch(function () {}); }
+    return ctx;
+  }
+
+  function buf(name, cb) {
+    if (buffers[name]) { cb(buffers[name]); return; }
+    if (loading[name]) { loading[name].push(cb); return; }
+    loading[name] = [cb];
+    fetch("assets/audio/" + name + ".wav").then(function (r) {
+      if (!r.ok) throw new Error("http " + r.status);
+      return r.arrayBuffer();
+    }).then(function (ab) {
+      return ensureCtx().decodeAudioData(ab);
+    }).then(function (b) {
+      buffers[name] = b;
+      loading[name].forEach(function (f) { f(b); });
+      delete loading[name];
+    }).catch(function () {
+      loading[name].forEach(function (f) { f(null); });
+      delete loading[name];
+    });
+  }
+
   return {
     setAmbient: function (on) {
+      wantAmbient = !!on;
       if (!ambient) { ambient = document.querySelector("audio#ambient"); }
       if (!ambient) return;
       if (on) tryPlay(ambient); else ambient.pause();
     },
     setBgm: function (on) {
+      wantBgm = !!on;
       if (!bgm) { bgm = document.querySelector("audio#bgm"); }
       if (!bgm) return;
       if (on) tryPlay(bgm); else bgm.pause();
+    },
+    // 音效总开关（仪式喇叭/纪念馆 BGM 按钮共用）：静音时循环不停，只降主增益
+    setSfx: function (on) {
+      if (!ctx) { if (!on) return; if (!ensureCtx()) return; }
+      sfxMaster.gain.setTargetAtTime(on ? 0.9 : 0, ctx.currentTime, 0.05);
+    },
+    // 单次音效
+    one: function (name, gain) {
+      var c = ensureCtx();
+      if (!c) return;
+      buf(name, function (b) {
+        if (!b) return;
+        var s = c.createBufferSource();
+        s.buffer = b;
+        var g = c.createGain();
+        g.gain.value = gain == null ? 0.8 : gain;
+        s.connect(g); g.connect(sfxMaster);
+        s.start();
+      });
+    },
+    // 循环音效句柄：{ setGain(v) 随动画强度, stop(fadeSec) }；解码完成前 setGain 记待加值
+    loop: function (name, gain) {
+      var c = ensureCtx();
+      var h = {
+        _on: true, _s: null, _g: null, _v: gain || 0,
+        setGain: function (v) { this._v = v; if (this._g && this._on) this._g.gain.setTargetAtTime(v, c.currentTime, 0.08); },
+        stop: function (fade) {
+          if (!this._on) return;
+          this._on = false;
+          liveLoops = liveLoops.filter(function (x) { return x !== h; });
+          var s = this._s, g = this._g;
+          if (!s || !g) return;
+          var f = fade == null ? 0.3 : fade;
+          g.gain.setTargetAtTime(0, c.currentTime, f / 3);
+          setTimeout(function () { try { s.stop(); } catch (e) {} }, f * 1000 + 120);
+        }
+      };
+      if (!c) return h;
+      liveLoops.push(h);
+      buf(name, function (b) {
+        if (!b || !h._on) return;
+        var s = c.createBufferSource();
+        s.buffer = b; s.loop = true;
+        var g = c.createGain();
+        g.gain.value = h._v;
+        s.connect(g); g.connect(sfxMaster);
+        s.start();
+        h._s = s; h._g = g;
+      });
+      return h;
+    },
+    // 离场/建馆完成：停掉所有循环句柄（防漏到下一视图）
+    stopLoops: function () {
+      liveLoops.slice().forEach(function (h) { h.stop(0.3); });
+    },
+    // 首次手势解锁：恢复 AudioContext + 补播被 autoplay 拦截的 loop 元素
+    unlock: function () {
+      ensureCtx();
+      if (wantAmbient && ambient && ambient.paused) tryPlay(ambient);
+      if (wantBgm && bgm && bgm.paused) tryPlay(bgm);
     }
   };
 })();

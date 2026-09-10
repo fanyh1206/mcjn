@@ -39,6 +39,8 @@ PM.Acts = (function () {
   function drawUrn(ctx, x, y, s, opts) {
     opts = opts || {};
     var w = 100 * s, h = 118 * s;
+    // 素材加载中：跳过本帧绘制，避免先闪现代码绘制的旧罐再切图片罐
+    if (!PM.Assets.ready('urn_body')) return;
     // 优先使用 AI 素材（5.7.7 加载失败降级）
     var bodyImg = PM.Assets.get('urn_body');
     var lidImg = PM.Assets.get('urn_lid');
@@ -129,6 +131,8 @@ PM.Acts = (function () {
   function drawCoffin(ctx, x, y, s, opts) {
     opts = opts || {};
     var w = 190 * s, h = 78 * s, lidClose = opts.lidClose == null ? 0 : opts.lidClose;
+    // 素材加载中：跳过本帧绘制，避免先闪现代码绘制的旧棺再切图片棺
+    if (!PM.Assets.ready('coffin_body')) return null;
     // 优先使用 AI 素材
     var bodyImg = PM.Assets.get('coffin_body');
     var lidImg = PM.Assets.get('coffin_lid');
@@ -275,6 +279,9 @@ PM.Acts = (function () {
       if (el) el.classList.add("burning");
       this._t = 0;
       C.setVignette(true);
+      if (this._fireSnd) this._fireSnd.stop(0.2); // 防重放（resize 重进幕）孤儿循环
+      // 点击“点燃送别的火”后：火焰燃烧循环声，增益随火势起落，直到幕3 火焰消失才停
+      this._fireSnd = C.sfx.loop("fire_loop", 0);
       C.delay(3000, function () { C.next(); });
     },
     update: function (C, dt) {
@@ -292,6 +299,7 @@ PM.Acts = (function () {
       this._fireL.x = pr.x + 6; this._fireL.y = pr.y + pr.h - climb * 0.2;
       this._fireR.x = pr.x + pr.w - 6; this._fireR.y = pr.y + pr.h - climb * 0.2;
       this._fireL.intensity = intensity; this._fireR.intensity = intensity;
+      if (this._fireSnd) this._fireSnd.setGain(intensity * 0.8);
       // 底部主火
       if (!this._fireB) this._fireB = PM.FX.createFire({ rate: 30, width: pr.w * 0.8 });
       this._fireB.x = pr.cx; this._fireB.y = pr.y + pr.h;
@@ -302,7 +310,10 @@ PM.Acts = (function () {
       this._fireB.update(dt, C.system);
     },
     draw: function () {},
-    leave: function () { this._fireL = this._fireR = this._fireB = null; },
+    leave: function () {
+      if (this._fireSnd) { this._fireSnd.stop(0.5); this._fireSnd = null; }
+      this._fireL = this._fireR = this._fireB = null;
+    },
     onButton: function () {}
   };
 
@@ -317,6 +328,9 @@ PM.Acts = (function () {
       this._pileGrowth = 0;
       var el = getPhotoEl();
       if (el) el.classList.add("ashed");
+      if (this._fireSnd) this._fireSnd.stop(0.2); // 防重放孤儿循环
+      this._fireSnd = C.sfx.loop("fire_loop", 0.8); // 余火循环床，随渐弱降增益
+      this._fireOff = false;
       C.delay(600, function () { C.setVignette(false); });
       C.delay(3000, function () {
         C.hidePhoto(false);
@@ -331,6 +345,11 @@ PM.Acts = (function () {
       this._fire.x = L.cx; this._fire.y = L.groundY - 10;
       this._fire.intensity = Math.max(0, 1 - this._t / 1.5);
       this._fire.update(dt, C.system);
+      if (this._fireSnd) {
+        var fg = Math.max(0, 1 - this._t / 1.5) * 0.8;
+        this._fireSnd.setGain(fg);
+        if (fg <= 0 && !this._fireOff) { this._fireOff = true; this._fireSnd.stop(0.4); }
+      }
       // 灰烬飘落
       if (!this._ash) this._ash = PM.FX.createAsh({ rate: 26, width: L.steleW * 1.2 });
       this._ash.x = L.cx; this._ash.y = L.groundY - L.steleH * 0.5;
@@ -345,7 +364,10 @@ PM.Acts = (function () {
       this._pileW = L.steleW * 0.7;
       drawAshPile(C.ctx, L.cx, this._pileY, this._pileW, this._pileGrowth);
     },
-    leave: function () { this._fire = this._ash = null; },
+    leave: function () {
+      if (this._fireSnd) { this._fireSnd.stop(0.3); this._fireSnd = null; }
+      this._fire = this._ash = null;
+    },
     onButton: function (C) { C.hideButton(); C.next(); }
   };
 
@@ -369,7 +391,9 @@ PM.Acts = (function () {
       var targetX = L.cx + L.steleW * 0.42;
       if (this._phase === "move") {
         this._urnX += (targetX - this._urnX) * Math.min(1, dt * 2.2);
-        if (Math.abs(this._urnX - targetX) < 3 && this._t > 0.8) { this._phase = "sweep"; this._t = 0; }
+        if (Math.abs(this._urnX - targetX) < 3 && this._t > 0.8) {
+          this._phase = "sweep"; this._t = 0;
+        }
       } else if (this._phase === "sweep") {
         this._pile = Math.max(0, 1 - this._t / 1.3);
         if (this._pile > 0.02) {
@@ -381,7 +405,7 @@ PM.Acts = (function () {
             count: 8, duration: 0.8
           });
         }
-        if (this._t > 1.4) { this._phase = "lid"; this._t = 0; }
+        if (this._t > 1.4) { this._phase = "lid"; this._t = 0; C.sfx.one("urn_lid", 0.8); }
       } else if (this._phase === "lid") {
         this._lid = Math.max(0, 1 - this._t / 0.8);
         // 盖合后轻震
@@ -413,6 +437,7 @@ PM.Acts = (function () {
       this._urnFrom = 0;
       this._urnScale = 0.62;
       this._lid = 0;
+      this._lidSnd = false;
       C.setBgImage(false);
     },
     update: function (C, dt) {
@@ -441,6 +466,7 @@ PM.Acts = (function () {
         var urnHk = 108 * s * this._urnScale;
         this._urnY = this._urnFrom + (mouthY + urnHk * 1.02 - this._urnFrom) * k;
         this._lid = Math.max(0, Math.min(1, (this._t - 0.5) / 0.8));
+        if (!this._lidSnd && this._t > 0.5) { this._lidSnd = true; C.sfx.one("coffin_lid", 0.85); } // 棺盖滑合
         if (this._t > 1.6) { C.showButton(act5.button); this._phase = "done"; }
       }
     },
@@ -465,6 +491,10 @@ PM.Acts = (function () {
       this._phase = "lower"; // lower -> cover -> settle -> done
       this._coffinY = C.layout.groundY - 90;
       this._cover = 0;
+      this._soilOff = false;
+      if (this._soilSnd) { this._soilSnd.stop(0.2); this._soilSnd = null; } // 防重放孤儿循环
+      // 点击“安葬入土”后即开始挖土声，持续到覆土将满（立碑按钮出现前约 1 秒）
+      this._soilSnd = C.sfx.loop("soil_loop", 0.8);
       C.setBgImage(true);
     },
     update: function (C, dt) {
@@ -472,13 +502,21 @@ PM.Acts = (function () {
       var L = C.layout;
       if (this._phase === "lower") {
         this._coffinY += ((L.groundY + 6) - this._coffinY) * Math.min(1, dt * 1.8);
-        if (Math.abs(this._coffinY - (L.groundY + 6)) < 3 && this._t > 1.0) { this._phase = "cover"; this._t = 0; }
+        if (Math.abs(this._coffinY - (L.groundY + 6)) < 3 && this._t > 1.0) {
+          this._phase = "cover"; this._t = 0;
+        }
       } else if (this._phase === "cover") {
         this._cover = Math.min(1, this._t / 2.0);
         if (!this._soil) this._soil = PM.FX.createSoil({ rate: 26, width: L.steleW * 1.6 });
         this._soil.x = L.cx; this._soil.y = L.groundY;
         this._soil.intensity = this._cover < 1 ? 1 : 0;
         this._soil.update(dt, C.system);
+        // 挖土声在“立碑纪念”按钮出现前约 1 秒收掉：cover t>2.1 进 settle、settle t>0.8 出按钮，
+        // 故 t=1.5 起淡出(0.4s)→约 t=1.9 静默→距按钮约 1.0s
+        if (!this._soilOff && this._t > 1.5) {
+          this._soilOff = true;
+          if (this._soilSnd) { this._soilSnd.stop(0.4); this._soilSnd = null; }
+        }
         if (this._t > 2.1) {
           this._phase = "settle"; this._t = 0;
           PM.FX.spawnDustRing(C.system, { x: L.cx, y: L.groundY, count: 24, speed: 1.4 });
@@ -502,7 +540,10 @@ PM.Acts = (function () {
       var mound = this._phase === "lower" ? 0 : this._phase === "cover" ? this._cover * 0.6 : 0.6;
       PM.Scene.drawDirtMound(C.ctx, L, mound);
     },
-    leave: function () { this._soil = null; },
+    leave: function () {
+      if (this._soilSnd) { this._soilSnd.stop(0.3); this._soilSnd = null; }
+      this._soil = null;
+    },
     onButton: function (C) { C.hideButton(); C.next(); }
   };
 
@@ -592,7 +633,9 @@ PM.Acts = (function () {
       }
       C.ctx.restore();
     },
-    leave: function () { this._debris = false; this._caption = false; this._capT = undefined; },
+    leave: function () {
+      this._debris = false; this._caption = false; this._capT = undefined;
+    },
     onButton: function (C) {
       // 两段：焚香祭拜（炉出+点香）→ 建馆进纪念馆
       if (!this._offering) {
